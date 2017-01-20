@@ -496,7 +496,7 @@ int guild_recv_info(struct guild *sg) {
 		before=*sg;
 		//Perform the check on the user because the first load
 		guild_check_member(sg);
-		if ((sd = map_nick2sd(sg->master)) != NULL) {
+		if ((sd = map_nick2sd(sg->master,false)) != NULL) {
 			//If the guild master is online the first time the guild_info is received,
 			//that means he was the first to join, so apply guild skill blocking here.
 			if( battle_config.guild_skill_relog_delay )
@@ -1295,7 +1295,7 @@ int guild_getexp(struct map_session_data *sd,int exp) {
 /*====================================================
  * Ask to increase guildskill skill_id
  *---------------------------------------------------*/
-void guild_skillup(TBL_PC* sd, uint16 skill_id) {
+void guild_skillup(struct map_session_data* sd, uint16 skill_id) {
 	struct guild* g;
 	short idx = guild_skill_get_index(skill_id);
 	short max = 0;

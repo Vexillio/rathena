@@ -330,6 +330,10 @@
 
 	script_set_constant("EAJ_SUMMONER",MAPID_SUMMONER,false);
 
+	/* sex */
+	export_constant(SEX_FEMALE);
+	export_constant(SEX_MALE);
+
 	/* broadcasts */
 	export_constant(BC_ALL);
 	export_constant(BC_MAP);
@@ -408,6 +412,7 @@
 	export_constant(MF_NOCOSTUME);
 	export_constant(MF_GVG_TE_CASTLE);
 	export_constant(MF_GVG_TE);
+	export_constant(MF_HIDEMOBHPBAR);
 
 	/* setcell types */
 	export_constant(CELL_WALKABLE);
@@ -1430,6 +1435,9 @@
 	export_constant(SC_GOLDENMACECLAN);
 	export_constant(SC_CROSSBOWCLAN);
 	export_constant(SC_JUMPINGCLAN);
+	export_constant(SC_GEFFEN_MAGIC1);
+	export_constant(SC_GEFFEN_MAGIC2);
+	export_constant(SC_GEFFEN_MAGIC3);
 #ifdef RENEWAL
 	export_constant(SC_EXTREMITYFIST2);
 #endif
@@ -2470,9 +2478,18 @@
 	export_constant(SI_EP16_2_BUFF_AC);
 	export_constant(SI_GS_MAGICAL_BULLET);
 	export_constant(SI_FALLEN_ANGEL);
+	export_constant(SI_BLAZE_BEAD);
+	export_constant(SI_FROZEN_BEAD);
+	export_constant(SI_BREEZE_BEAD);
+	export_constant(SI_AID_PERIOD_RECEIVEITEM_2ND);
+	export_constant(SI_AID_PERIOD_PLUSEXP_2ND);
+	export_constant(SI_AID_PERIOD_PLUSJOBEXP_2ND);
+	export_constant(SI_PRONTERA_JP);
 	export_constant(SI_GLOOM_CARD);
 	export_constant(SI_PHARAOH_CARD);
 	export_constant(SI_KIEL_CARD);
+	export_constant(SI_S_MANAPOTION);
+	export_constant(SI_M_DEFSCROLL);
 
 	/* elements */
 	export_constant(ELE_NEUTRAL);
@@ -3180,6 +3197,22 @@
 	export_constant(STOR_MODE_NONE);
 	export_constant(STOR_MODE_GET);
 	export_constant(STOR_MODE_PUT);
+	
+	/* instance enter */
+	export_constant(IE_OK);
+	export_constant(IE_NOMEMBER);
+	export_constant(IE_NOINSTANCE);
+	export_constant(IE_OTHER);
+
+	/* instance info */
+	export_constant(IIT_ID);
+	export_constant(IIT_TIME_LIMIT);
+	export_constant(IIT_IDLE_TIMEOUT);
+	export_constant(IIT_ENTER_MAP);
+	export_constant(IIT_ENTER_X);
+	export_constant(IIT_ENTER_Y);
+	export_constant(IIT_MAPCOUNT);
+	export_constant(IIT_MAP);
 
 	/* item groups */
 	export_constant(IG_BLUEBOX);

@@ -487,6 +487,7 @@ enum clif_messages {
 	ITEM_REUSE_LIMIT = 0x746,
 	WORK_IN_PROGRESS = 0x783,
 	NEED_REINS_OF_MOUNT = 0x78c,
+	PARTY_MASTER_CHANGE_SAME_MAP = 0x82e, ///< "It is only possible to change the party leader while on the same map."
 	MERGE_ITEM_NOT_AVAILABLE = 0x887,
 };
 
@@ -591,10 +592,6 @@ void clif_leavechat(struct chat_data* cd, struct map_session_data* sd, bool flag
 void clif_changechatstatus(struct chat_data* cd);	// chat
 void clif_refresh_storagewindow(struct map_session_data *sd);
 void clif_refresh(struct map_session_data *sd);	// self
-
-void clif_fame_blacksmith(struct map_session_data *sd, int points);
-void clif_fame_alchemist(struct map_session_data *sd, int points);
-void clif_fame_taekwon(struct map_session_data *sd, int points);
 
 void clif_emotion(struct block_list *bl,int type);
 void clif_talkiebox(struct block_list* bl, const char* talkie);

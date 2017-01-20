@@ -1130,7 +1130,7 @@ static int clif_set_unit_idle(struct block_list* bl, unsigned char* buffer, bool
 	WBUFW(buf,53) = (sd ? sd->status.font : 0);
 #endif
 #if PACKETVER >= 20120221
-	if ( battle_config.monster_hp_bars_info && bl->type == BL_MOB && (status_get_hp(bl) < status_get_max_hp(bl)) ) {
+	if ( battle_config.monster_hp_bars_info && !map[bl->m].flag.hidemobhpbar && bl->type == BL_MOB && (status_get_hp(bl) < status_get_max_hp(bl)) ) {
 		WBUFL(buf,55) = status_get_max_hp(bl);		// maxHP
 		WBUFL(buf,59) = status_get_hp(bl);		// HP
 	} else {
@@ -1273,7 +1273,7 @@ static int clif_set_unit_walking(struct block_list* bl, struct unit_data* ud, un
 	WBUFW(buf,60) = (sd ? sd->status.font : 0);
 #endif
 #if PACKETVER >= 20120221
-	if ( battle_config.monster_hp_bars_info && bl->type == BL_MOB && (status_get_hp(bl) < status_get_max_hp(bl)) ) {
+	if ( battle_config.monster_hp_bars_info && !map[bl->m].flag.hidemobhpbar && bl->type == BL_MOB && (status_get_hp(bl) < status_get_max_hp(bl)) ) {
 		WBUFL(buf,62) = status_get_max_hp(bl);		// maxHP
 		WBUFL(buf,66) = status_get_hp(bl);		// HP
 	} else {
@@ -1493,17 +1493,16 @@ int clif_spawn(struct block_list *bl)
 
 /// Sends information about owned homunculus to the client . [orn]
 /// 022e <name>.24B <modified>.B <level>.W <hunger>.W <intimacy>.W <equip id>.W <atk>.W <matk>.W <hit>.W <crit>.W <def>.W <mdef>.W <flee>.W <aspd>.W <hp>.W <max hp>.W <sp>.W <max sp>.W <exp>.L <max exp>.L <skill points>.W <atk range>.W	(ZC_PROPERTY_HOMUN)
-/// 09f7 <name>.24B <modified>.B <level>.W <hunger>.W <intimacy>.W <equip id>.W <atk>.W <matk>.W <hit>.W <crit>.W <def>.W <mdef>.W <flee>.W <aspd>.W <hp>.W <max hp>.W <sp>.W <max sp>.W <exp>.L <max exp>.L <skill points>.W <atk range>.W		(ZC_PROPERTY_HOMUN_2)
+/// 09f7 <name>.24B <modified>.B <level>.W <hunger>.W <intimacy>.W <equip id>.W <atk>.W <matk>.W <hit>.W <crit>.W <def>.W <mdef>.W <flee>.W <aspd>.W <hp>.L <max hp>.L <sp>.W <max sp>.W <exp>.L <max exp>.L <skill points>.W <atk range>.W (ZC_PROPERTY_HOMUN_2)
 void clif_hominfo(struct map_session_data *sd, struct homun_data *hd, int flag)
 {
 	struct status_data *status;
 	unsigned char buf[128];
+	int offset;
 #if PACKETVER < 20141016
 	const int cmd = 0x22e;
-	int offset = 0;
 #else
 	const int cmd = 0x9f7;
-	int offset = 2;
 #endif
 	int htype;
 
@@ -1544,15 +1543,26 @@ void clif_hominfo(struct map_session_data *sd, struct homun_data *hd, int flag)
 #endif
 	WBUFW(buf,47) = status->flee;
 	WBUFW(buf,49) = (flag) ? 0 : status->amotion;
+#if PACKETVER >= 20141016
+	// Homunculus HP bar will screw up if the percentage calculation exceeds signed values
+	// Tested maximum: 21474836(=INT32_MAX/100), any value above will screw up the HP bar
+	if (status->max_hp > (INT32_MAX/100)) {
+		WBUFL(buf,51) = status->hp/(status->max_hp/100);
+		WBUFL(buf,55) = 100;
+	} else {
+		WBUFL(buf,51) = status->hp;
+		WBUFL(buf,55) = status->max_hp;
+	}
+	offset = 4;
+#else
 	if (status->max_hp > INT16_MAX) {
 		WBUFW(buf,51) = status->hp/(status->max_hp/100);
-		WBUFW(buf,53+offset) = 100;
+		WBUFW(buf,53) = 100;
 	} else {
 		WBUFW(buf,51) = status->hp;
-		WBUFW(buf,53+offset) = status->max_hp;
+		WBUFW(buf,53) = status->max_hp;
 	}
-#if PACKETVER >= 20141016
-	offset += 2;
+	offset = 0;
 #endif
 	if (status->max_sp > INT16_MAX) {
 		WBUFW(buf,55+offset) = status->sp/(status->max_sp/100);
@@ -3891,6 +3901,11 @@ void clif_changeoption(struct block_list* bl)
 	} else
 		clif_send(buf,packet_len(0x119),bl,AREA);
 #endif
+
+	//Whenever we send "changeoption" to the client, the provoke icon is lost
+	//There is probably an option for the provoke icon, but as we don't know it, we have to do this for now
+	if (sc->data[SC_PROVOKE] && sc->data[SC_PROVOKE]->timer == INVALID_TIMER)
+		clif_status_change(bl, StatusIconChangeTable[SC_PROVOKE], 1, -1, 0, 0, 0);
 }
 
 
@@ -4612,7 +4627,7 @@ void clif_getareachar_unit(struct map_session_data* sd,struct block_list *bl)
 			else if(md->special_state.size==SZ_MEDIUM)
 				clif_specialeffect_single(bl,421,sd->fd);
 #if PACKETVER >= 20120404
-			if( battle_config.monster_hp_bars_info){
+			if (battle_config.monster_hp_bars_info && !map[bl->m].flag.hidemobhpbar) {
 				int i;
 				for(i = 0; i < DAMAGELOG_SIZE; i++)// must show hp bar to all char who already hit the mob.
 					if( md->dmglog[i].id == sd->status.char_id )
@@ -4656,6 +4671,25 @@ static int clif_calc_walkdelay(struct block_list *bl,int delay, char type, int64
 	return (delay > 0) ? delay:1; //Return 1 to specify there should be no noticeable delay, but you should stop walking.
 }
 
+/*========================================== [Playtester]
+* Returns hallucination damage the client displays
+*------------------------------------------*/
+static int clif_hallucination_damage()
+{
+	int digit = rnd() % 5 + 1;
+	switch (digit)
+	{
+	case 1:
+		return (rnd() % 10);
+	case 2:
+		return (rnd() % 100);
+	case 3:
+		return (rnd() % 1000);
+	case 4:
+		return (rnd() % 10000);
+	}
+	return (rnd() % 32767);
+}
 
 /// Sends a 'damage' packet (src performs action on dst)
 /// 008a <src ID>.L <dst ID>.L <server tick>.L <src speed>.L <dst speed>.L <damage>.W <div>.W <type>.B <damage2>.W (ZC_NOTIFY_ACT)
@@ -4699,8 +4733,8 @@ int clif_damage(struct block_list* src, struct block_list* dst, unsigned int tic
 	sc = status_get_sc(dst);
 	if(sc && sc->count) {
 		if(sc->data[SC_HALLUCINATION]) {
-			if(damage) damage = damage*(sc->data[SC_HALLUCINATION]->val2) + rnd()%100;
-			if(damage2) damage2 = damage2*(sc->data[SC_HALLUCINATION]->val2) + rnd()%100;
+			if(damage) damage = clif_hallucination_damage();
+			if(damage2) damage2 = clif_hallucination_damage();
 		}
 	}
 
@@ -5440,7 +5474,7 @@ int clif_skill_damage(struct block_list *src,struct block_list *dst,unsigned int
 
 	if( ( sc = status_get_sc(dst) ) && sc->count ) {
 		if(sc->data[SC_HALLUCINATION] && damage)
-			damage = damage*(sc->data[SC_HALLUCINATION]->val2) + rnd()%100;
+			damage = clif_hallucination_damage();
 	}
 
 #if PACKETVER < 3
@@ -5537,7 +5571,7 @@ int clif_skill_damage2(struct block_list *src,struct block_list *dst,unsigned in
 
 	if(sc && sc->count) {
 		if(sc->data[SC_HALLUCINATION] && damage)
-			damage = damage*(sc->data[SC_HALLUCINATION]->val2) + rnd()%100;
+			damage = clif_hallucination_damage();
 	}
 
 	WBUFW(buf,0)=0x115;
@@ -5936,6 +5970,9 @@ void clif_status_change(struct block_list *bl, int type, int flag, int tick, int
 	if (type == SI_ACTIONDELAY && tick == 0)
 		return;
 
+	if (type == SI_HALLUCINATION && !battle_config.display_hallucination) // Disable Hallucination.
+		return;
+
 	nullpo_retv(bl);
 
 	sd = BL_CAST(BL_PC, bl);
@@ -6232,7 +6269,7 @@ void clif_map_property(struct block_list *bl, enum map_property property, enum s
 		((map[bl->m].flag.battleground || map_flag_gvg(bl->m)?1:0)<<1)|// GUILD - Show attack cursor on non-guild members (GvG)
 		((map[bl->m].flag.battleground || map_flag_gvg2(bl->m)?1:0)<<2)|// SIEGE - Show emblem over characters heads when in GvG (WoE castle)
 		((map[bl->m].flag.nomineeffect || !map_flag_gvg2(bl->m)?0:1)<<3)| // USE_SIMPLE_EFFECT - Automatically enable /mineffect
-		((map[bl->m].flag.nolockon?1:0)<<4)| // DISABLE_LOCKON - Unknown (By the name it might disable cursor lock-on)
+		((map[bl->m].flag.nolockon || map_flag_vs(bl->m)?1:0)<<4)| // DISABLE_LOCKON - Only allow attacks on other players with shift key or /ns active
 		((map[bl->m].flag.pvp?1:0)<<5)| // COUNT_PK - Show the PvP counter
 		((map[bl->m].flag.partylock?1:0)<<6)| // NO_PARTY_FORMATION - Prevents party creation/modification (Might be used for instance dungeons)
 		((map[bl->m].flag.battleground?1:0)<<7)| // BATTLEFIELD - Unknown (Does something for battlegrounds areas)
@@ -6353,7 +6390,7 @@ void clif_wis_message(int fd, const char* nick, const char* mes, int mes_len)
 	safestrncpy(WFIFOCP(fd,28), mes, mes_len);
 	WFIFOSET(fd,WFIFOW(fd,2));
 #else
-	struct map_session_data *ssd = map_nick2sd(nick);
+	struct map_session_data *ssd = map_nick2sd(nick,false);
 
 	WFIFOHEAD(fd, mes_len + NAME_LENGTH + 8);
 	WFIFOW(fd,0) = 0x97;
@@ -11034,7 +11071,7 @@ void clif_parse_WisMessage(int fd, struct map_session_data* sd)
 	}
 
 	// searching destination character
-	dstsd = map_nick2sd(target);
+	dstsd = map_nick2sd(target,false);
 
 	if (dstsd == NULL || strcmp(dstsd->status.name, target) != 0) {
 		// player is not on this map-server
@@ -12695,7 +12732,7 @@ void clif_parse_PartyInvite2(int fd, struct map_session_data *sd){
 		return;
 	}
 
-	t_sd = map_nick2sd(name);
+	t_sd = map_nick2sd(name,false);
 
 	if(t_sd && t_sd->state.noask) {// @noask [LuzZza]
 		clif_noask_sub(sd, t_sd, 1);
@@ -13323,7 +13360,7 @@ void clif_parse_GuildInvite(int fd,struct map_session_data *sd){
 /// 0916 <char name>.24B (CZ_REQ_JOIN_GUILD2)
 void
 clif_parse_GuildInvite2(int fd, struct map_session_data *sd) {
-	struct map_session_data *t_sd = map_nick2sd(RFIFOCP(fd, packet_db[sd->packet_ver][RFIFOW(fd,0)].pos[0]));
+	struct map_session_data *t_sd = map_nick2sd(RFIFOCP(fd, packet_db[sd->packet_ver][RFIFOW(fd,0)].pos[0]),false);
 
 	if (clif_sub_guild_invite(fd, sd, t_sd))
 		return;
@@ -14175,15 +14212,7 @@ void clif_parse_FriendsListAdd(int fd, struct map_session_data *sd)
 	struct map_session_data *f_sd;
 	int i;
 
-	f_sd = map_nick2sd(RFIFOCP(fd,packet_db[sd->packet_ver][RFIFOW(fd,0)].pos[0]));
-
-	// ensure that the request player's friend list is not full
-	ARR_FIND(0, MAX_FRIENDS, i, sd->status.friends[i].char_id == 0);
-
-	if( i == MAX_FRIENDS ) {
-		clif_friendslist_reqack(sd, f_sd, 2);
-		return;
-	}
+	f_sd = map_nick2sd(RFIFOCP(fd,packet_db[sd->packet_ver][RFIFOW(fd,0)].pos[0]),false);
 
 	// Friend doesn't exist (no player with this name)
 	if (f_sd == NULL) {
@@ -14192,6 +14221,14 @@ void clif_parse_FriendsListAdd(int fd, struct map_session_data *sd)
 	}
 
 	if( sd->bl.id == f_sd->bl.id ) {// adding oneself as friend
+		return;
+	}
+
+	// ensure that the request player's friend list is not full
+	ARR_FIND(0, MAX_FRIENDS, i, sd->status.friends[i].char_id == 0);
+
+	if( i == MAX_FRIENDS ){
+		clif_friendslist_reqack(sd, f_sd, 2);
 		return;
 	}
 
@@ -14596,7 +14633,7 @@ void clif_parse_Check(int fd, struct map_session_data *sd)
 
 	safestrncpy(charname, RFIFOCP(fd,packet_db[sd->packet_ver][RFIFOW(fd,0)].pos[0]), sizeof(charname));
 
-	if( ( pl_sd = map_nick2sd(charname) ) == NULL || pc_get_group_level(sd) < pc_get_group_level(pl_sd) )
+	if( ( pl_sd = map_nick2sd(charname,false) ) == NULL || pc_get_group_level(sd) < pc_get_group_level(pl_sd) )
 	{
 		return;
 	}

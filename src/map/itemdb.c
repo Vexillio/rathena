@@ -47,7 +47,7 @@ struct s_item_group_db *itemdb_group_exists(unsigned short group_id) {
 bool itemdb_group_item_exists(unsigned short group_id, unsigned short nameid)
 {
 	struct s_item_group_db *group = (struct s_item_group_db *)uidb_get(itemdb_group, group_id);
-	uint8 i, j;
+	unsigned short i, j;
 
 	if (!group)
 		return false;
@@ -571,6 +571,7 @@ static bool itemdb_read_itemavail(char* str[], int columns, int current) {
 }
 
 static int itemdb_group_free(DBKey key, DBData *data, va_list ap);
+static int itemdb_group_free2(DBKey key, DBData *data);
 
 static bool itemdb_read_group(char* str[], int columns, int current) {
 	int group_id = -1;
@@ -603,7 +604,7 @@ static bool itemdb_read_group(char* str[], int columns, int current) {
 		DBData data;
 
 		if( itemdb_group->remove( itemdb_group, db_ui2key(group_id), &data ) ){
-			itemdb_group_free( db_ui2key(group_id), &data, 0 );
+			itemdb_group_free2(db_ui2key(group_id), &data);
 			ShowNotice( "itemdb_read_group: Item Group '%s' has been cleared.\n", str[0] );
 			return true;
 		}else{
@@ -1302,7 +1303,7 @@ static bool itemdb_parse_dbrow(char** str, const char* source, int line, int scr
 		id->slot = MAX_SLOTS;
 	}
 
-	itemdb_jobid2mapid(id->class_base, (uint64)strtoul(str[11],NULL,0));
+	itemdb_jobid2mapid(id->class_base, (uint64)strtoull(str[11],NULL,0));
 	id->class_upper = atoi(str[12]);
 	id->sex	= atoi(str[13]);
 	id->equip = atoi(str[14]);
@@ -1702,7 +1703,7 @@ static void itemdb_read(void) {
 		}
 		
 		sv_readdb(dbsubpath1, "item_avail.txt",         ',', 2, 2, -1, &itemdb_read_itemavail, i);
-		sv_readdb(dbsubpath1, "item_stack.txt",         ',', 3, 3, -1, &itemdb_read_stack, i);
+		sv_readdb(dbsubpath2, "item_stack.txt",         ',', 3, 3, -1, &itemdb_read_stack, i);
 		sv_readdb(dbsubpath1, "item_nouse.txt",         ',', 3, 3, -1, &itemdb_read_nouse, i);
 		sv_readdb(dbsubpath2, "item_group_db.txt",		',', 2, 10, -1, &itemdb_read_group, i);
 		sv_readdb(dbsubpath2, "item_bluebox.txt",		',', 2, 10, -1, &itemdb_read_group, i);
@@ -1774,7 +1775,19 @@ static int itemdb_final_sub(DBKey key, DBData *data, va_list ap)
 	return 0;
 }
 
+/** NOTE:
+* In some OSs, like Raspbian, we aren't allowed to pass 0 in va_list.
+* So, itemdb_group_free2 is useful in some cases.
+* NB : We keeping that funciton cause that signature is needed for some iterator..
+*/
 static int itemdb_group_free(DBKey key, DBData *data, va_list ap) {
+	return itemdb_group_free2(key,data);
+}
+
+/** (ARM)
+* Adaptation of itemdb_group_free. This function enables to compile rAthena on Raspbian OS.
+*/
+static inline int itemdb_group_free2(DBKey key, DBData *data) {
 	struct s_item_group_db *group = (struct s_item_group_db *)db_data2ptr(data);
 	uint8 j;
 	if (!group)

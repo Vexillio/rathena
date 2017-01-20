@@ -1234,7 +1234,7 @@ int intif_parse_WisMessage(int fd)
 	id=RFIFOL(fd,4);
 
 	safestrncpy(name, RFIFOCP(fd,32), NAME_LENGTH);
-	sd = map_nick2sd(name);
+	sd = map_nick2sd(name,false);
 	if(sd == NULL || strcmp(sd->status.name, name) != 0)
 	{	//Not found
 		intif_wis_replay(id,1);
@@ -1272,7 +1272,7 @@ int intif_parse_WisEnd(int fd)
 
 	if (battle_config.etc_log)
 		ShowInfo("intif_parse_wisend: player: %s, flag: %d\n", RFIFOP(fd,2), RFIFOB(fd,26)); // flag: 0: success to send wisper, 1: target character is not loged in?, 2: ignored by target
-	sd = (struct map_session_data *)map_nick2sd(RFIFOCP(fd,2));
+	sd = (struct map_session_data *)map_nick2sd(RFIFOCP(fd,2),false);
 	if (sd != NULL)
 		clif_wis_end(sd->fd, RFIFOB(fd,26));
 
@@ -1976,7 +1976,7 @@ QUESTLOG SYSTEM FUNCTIONS
  * Requests a character's quest log entries to the inter server.
  * @param sd Character's data
  */
-void intif_request_questlog(TBL_PC *sd)
+void intif_request_questlog(struct map_session_data *sd)
 {
 	if (CheckForCharServer())
 		return;
@@ -2059,7 +2059,7 @@ void intif_parse_questsave(int fd)
  * @param sd Character's data
  * @return 0 in case of success, nonzero otherwise
  */
-int intif_quest_save(TBL_PC *sd)
+int intif_quest_save(struct map_session_data *sd)
 {
 	int len = sizeof(struct quest) * sd->num_quests + 8;
 
@@ -3220,7 +3220,7 @@ static bool intif_parse_StorageReceived(int fd)
 			status_set_viewdata(&sd->bl, sd->status.class_);
 			pc_load_combo(sd);
 			status_calc_pc(sd, (enum e_status_calc_opt)(SCO_FIRST|SCO_FORCE));
-			status_calc_weight(sd, 1|2); // Refresh item weight data
+			status_calc_weight(sd, CALCWT_ITEM|CALCWT_MAXBONUS); // Refresh weight data
 			chrif_scdata_request(sd->status.account_id, sd->status.char_id);
 			break;
 		}

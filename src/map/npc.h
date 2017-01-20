@@ -108,7 +108,7 @@ enum actor_classes
 #define MAX_NPC_CLASS 1000
 // New NPC range
 #define MAX_NPC_CLASS2_START 10000
-#define MAX_NPC_CLASS2_END 10208
+#define MAX_NPC_CLASS2_END 10236
 
 //Checks if a given id is a valid npc id. [Skotlex]
 //Since new npcs are added all the time, the max valid value is the one before the first mob (Scorpion = 1001)
@@ -169,7 +169,6 @@ void do_clear_npc(void);
 void do_final_npc(void);
 void do_init_npc(void);
 void npc_event_do_oninit(void);
-int npc_do_ontimer(int npc_id, int option);
 
 int npc_event_do(const char* name);
 int npc_event_do_id(const char* name, int rid);
